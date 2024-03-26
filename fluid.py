@@ -266,21 +266,26 @@ class HelloWorld(mglw.WindowConfig):
 	def diffuse(self, q0, kappa, dt, boundary_type):
 		'''Solve the diffusion equation using the implicit method.'''
 		print("diffusion is being called")
-		q0 = q.copy()
-		a=dt*kappa*self.iterations**2
-		for k in range(20):
-			for i in range(self.iterations):
-				for j in range(self.iterations):
-					q[1:-1, 1:-1] = (q0[1:-1, 1:-1] + a*(q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:]))/(1+4*a)
-					q = self.set_boundary(q, boundary_type)
+		# q = q0.copy()
+		# a=dt*kappa*self.iterations**2
+		# for k in range(20):
+		# 	for i in range(self.iterations):
+		# 		for j in range(self.iterations):
+		# 			q[1:-1, 1:-1] = (q0[1:-1, 1:-1] + a*(q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:]))/(1+4*a)
+		# 			q = self.set_boundary(q, boundary_type)
+		N = len(q0) - 2
+		a = dt * kappa * N * N
+		q = q0.copy()
 
-
-		# for _ in range(self.iterations):
-		# 	q[1:-1, 1:-1] = ((q0[1:-1, 1:-1] + kappa * dt * (
-		# 		q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:])) /
-		# 		(1 + 4 * kappa * dt))
-		# 	q = self.set_boundary(q, boundary_type)
+		for _ in range(20):
+			for i in range(1, N+1):
+				for j in range(1, N+1):
+					q[i, j] = (q0[i, j] + a * (q[i-1, j] + q[i+1, j] + q[i, j-1] + q[i, j+1])) / (1 + 4 * a)
+					print("these are the positions", i, j)
+					print("this is q at positions", q[i, j])
+			self.set_boundary(q, boundary_type)
 		return q
+	
 			# TODO: STEP 3: Complete this function
 		# return q0 placeholder, but return the correct result as a np.array
 
@@ -363,22 +368,41 @@ class HelloWorld(mglw.WindowConfig):
 				boundary_type (str): type of boundary condition to apply (None, "vertical", "horizontal")
 			Returns (np.array): Advected quantities
 		'''
-		print("advection is being called")
 		# TODO: STEP 4: Complete this function
-		dt0 = dt * self.iterations
-		i, j, a, b = self.xy_to_ij(self.particles[:, 0], self.particles[:, 1])
 
-		for k in range(self.iterations):
-			for l in range(self.iterations):
-				a[k,l] = k - dt0 * gv[k, l, 1]
-				b[k,l] = l - dt0 * gv[k, l, 0]
-				i = 0.5 if i < 0.5 else i
+		# dt0 = dt * self.iterations
+		# i, j, a, b = self.xy_to_ij(self.particles[:, 0], self.particles[:, 1])
 
-
-
+		# for k in range(self.iterations):
+		# 	for l in range(self.iterations):
+		# 		a[k,l] = k - dt0 * gv[k, l, 1]
+		# 		b[k,l] = l - dt0 * gv[k, l, 0]
+		# 		i = 0.5 if i < 0.5 else i
 
 
-		return q # placeholder, but return the correct result as a np.array
+
+		N = len(q) - 2
+		d = q.copy()
+		d0 = q.copy()
+		print("this is gv", gv)
+		u, v = gv[:,:,0], gv[:,:,1]
+		dt0 = dt * N
+
+		for i in range(1, N+1):
+			for j in range(1, N+1):
+				x = i - dt0 * u[i, j]
+				y = j - dt0 * v[i, j]
+				x = min(max(x, 0.5), N + 0.5)
+				y = min(max(y, 0.5), N + 0.5)
+				i0, j0 = int(x), int(y)
+				i1, j1 = i0 + 1, j0 + 1
+				s1, t1 = x - i0, y - j0
+				s0, t0 = 1 - s1, 1 - t1
+				d[i, j] = s0 * (t0 * d0[i0, j0] + t1 * d0[i0, j1]) + s1 * (t0 * d0[i1, j0] + t1 * d0[i1, j1])
+
+		self.set_boundary(d, boundary_type)
+    	
+		return d
 
 	def step(self, dt):
 		self.add_source_temperature(dt)
@@ -402,7 +426,8 @@ class HelloWorld(mglw.WindowConfig):
 
 	def scalar_step(self, dt):
 		# TODO: STEP 5: Complete this function with a call to the diffuse and advect functions
-		return # return nothing, this should modify the temperature field in place
+		self.curr_tp = self.diffuse(self.curr_tp, self.kappa, dt, "horizontal")
+		self.curr_tp = self.advect(self.curr_tp, dt, self.curr_v, "horizontal")
 
 	def velocity_step(self, dt):
 		# TODO: STEP 7: Complete this function with calls to the diffuse, project, and advect functions
@@ -412,7 +437,35 @@ class HelloWorld(mglw.WindowConfig):
 	def project(self):
 		'''Solves the pressure Poisson equation to make the velocity field divergence free.'''
 		# TODO: STEP 6: Complete this function
-		return # return nothing, this should modify the velocity field in place
+		N = len(self.curr_tp) - 2
+		h = 1.0 / N
+		u, v = self.curr_v[:,:,0], self.curr_v[:,:,1]
+		p = np.zeros((N+2, N+2))
+		div = np.zeros((N+2, N+2))
+
+		for i in range(1, N+1):
+			for j in range(1, N+1):
+				div[i, j] = -0.5 * h * (u[i+1, j] - u[i-1, j] + v[i, j+1] - v[i, j-1])
+				p[i, j] = 0
+
+		self.set_boundary(div, 0)
+		self.set_boundary(p, 0)
+
+		for _ in range(20):
+			for i in range(1, N+1):
+				for j in range(1, N+1):
+					p[i, j] = (div[i, j] + p[i-1, j] + p[i+1, j] + p[i, j-1] + p[i, j+1]) / 4
+
+			self.set_boundary(p, 0)
+
+		for i in range(1, N+1):
+			for j in range(1, N+1):
+				u[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / h
+				v[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / h
+
+		self.set_boundary(u, 1)
+		self.set_boundary(v, 2)
+		
 	
 	def render(self, time, frame_time):		
 		self.ctx.clear(0,0,0)
