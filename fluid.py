@@ -281,8 +281,8 @@ class HelloWorld(mglw.WindowConfig):
 			for i in range(1, N+1):
 				for j in range(1, N+1):
 					q[i, j] = (q0[i, j] + a * (q[i-1, j] + q[i+1, j] + q[i, j-1] + q[i, j+1])) / (1 + 4 * a)
-					print("these are the positions", i, j)
-					print("this is q at positions", q[i, j])
+					# print("these are the positions", i, j)
+					# print("this is q at positions", q[i, j])
 			self.set_boundary(q, boundary_type)
 		return q
 	
@@ -407,7 +407,7 @@ class HelloWorld(mglw.WindowConfig):
 	def step(self, dt):
 		self.add_source_temperature(dt)
 		self.apply_temperature_force(dt)        
-		self.velocity_step(dt)
+		#self.velocity_step(dt)
 		self.scalar_step(dt)
 		self.advect_particles(dt)
 
@@ -431,7 +431,29 @@ class HelloWorld(mglw.WindowConfig):
 
 	def velocity_step(self, dt):
 		# TODO: STEP 7: Complete this function with calls to the diffuse, project, and advect functions
-		return # return nothing, this should modify the velocity field in place
+		N = len(self.curr_tp) - 2
+		visc = self.viscosity
+		u0, v0 = self.curr_v[:,:,0], self.curr_v[:,:,1]
+		u, v = np.zeros((N+2, N+2)), np.zeros((N+2, N+2))
+
+		self.add_source_temperature(dt)
+		self.add_source_temperature(dt)
+
+		u0, u = u, u0
+		self.diffuse(self.curr_tp, visc, dt, "horizontal")
+
+		v0, v = v, v0
+		self.diffuse(self.curr_tp, visc, dt, "vertical")
+
+		self.project()
+
+		u0, u = u, u0
+		v0, v = v, v0
+
+		self.advect(self.curr_tp, dt, np.array([u0, v0]), "horizontal")
+		self.advect(self.curr_tp, dt, np.array([u0, v0]), "vertical")
+
+		self.project()
 
 	# Projection step to make the velocity field divergence free
 	def project(self):
@@ -448,23 +470,23 @@ class HelloWorld(mglw.WindowConfig):
 				div[i, j] = -0.5 * h * (u[i+1, j] - u[i-1, j] + v[i, j+1] - v[i, j-1])
 				p[i, j] = 0
 
-		self.set_boundary(div, 0)
-		self.set_boundary(p, 0)
+		self.set_boundary(div, None)
+		self.set_boundary(p, None)
 
 		for _ in range(20):
 			for i in range(1, N+1):
 				for j in range(1, N+1):
 					p[i, j] = (div[i, j] + p[i-1, j] + p[i+1, j] + p[i, j-1] + p[i, j+1]) / 4
 
-			self.set_boundary(p, 0)
+			self.set_boundary(p, None)
 
 		for i in range(1, N+1):
 			for j in range(1, N+1):
 				u[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / h
 				v[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / h
 
-		self.set_boundary(u, 1)
-		self.set_boundary(v, 2)
+		self.set_boundary(u, "horizontal")
+		self.set_boundary(v, "vertical")
 		
 	
 	def render(self, time, frame_time):		
