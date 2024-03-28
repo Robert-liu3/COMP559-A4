@@ -265,7 +265,7 @@ class HelloWorld(mglw.WindowConfig):
 
 	def diffuse(self, q0, kappa, dt, boundary_type):
 		'''Solve the diffusion equation using the implicit method.'''
-		print("diffusion is being called")
+		# print("diffusion is being called")
 		# q = q0.copy()
 		# a=dt*kappa*self.iterations**2
 		# for k in range(20):
@@ -273,17 +273,24 @@ class HelloWorld(mglw.WindowConfig):
 		# 		for j in range(self.iterations):
 		# 			q[1:-1, 1:-1] = (q0[1:-1, 1:-1] + a*(q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:]))/(1+4*a)
 		# 			q = self.set_boundary(q, boundary_type)
-		N = len(q0) - 2
+		x = np.arange(self.nx+1)
+		y = np.arange(self.ny+1)
+		X, Y = np.meshgrid(x, y)
+
+
+		N = 1/self.dx
 		a = dt * kappa * N * N
 		q = q0.copy()
 
-		for _ in range(20):
-			for i in range(1, N+1):
-				for j in range(1, N+1):
-					q[i, j] = (q0[i, j] + a * (q[i-1, j] + q[i+1, j] + q[i, j-1] + q[i, j+1])) / (1 + 4 * a)
-					# print("these are the positions", i, j)
-					# print("this is q at positions", q[i, j])
+
+
+		for _ in range(self.iterations):
+			q[1:self.ny+1, 1:self.nx+1] = (q0[1:self.ny+1, 1:self.nx+1] + a * (q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:])) / (1 + 4 * a)
 			self.set_boundary(q, boundary_type)
+			# for i in range(1, self.ny+1):
+			# 	for j in range(1, self.nx+1):
+			# 		q[i, j] = (q0[i, j] + a * (q[i-1, j] + q[i+1, j] + q[i, j-1] + q[i, j+1])) / (1 + 4 * a)
+			# self.set_boundary(q, boundary_type)
 		return q
 	
 			# TODO: STEP 3: Complete this function
@@ -330,14 +337,14 @@ class HelloWorld(mglw.WindowConfig):
 		v01 = self.curr_v[i, j+1, 1]  # y-component of velocity at top-left corner
 		v11 = self.curr_v[i+1, j+1, 1]  # y-component of velocity at top-right corner
 
-		b_v = (1-a)*(1-b)*v00 + a*(1-b)*v10 + (1-a)*b*v01 + a*b*v11  # bilinear interpolation
+		b_v = (1-a)*(1-b)*v00 + (1-a)*b*v10 + a*(1-b)*v01 + a*b*v11  # bilinear interpolation
 
 		v00 = self.curr_v[i, j, 0]
 		v10 = self.curr_v[i+1, j, 0]
 		v01 = self.curr_v[i, j+1, 0]
 		v11 = self.curr_v[i+1, j+1, 0]
 
-		a_v = (1-a)*(1-b)*v00 + a*(1-b)*v10 + (1-a)*b*v01 + a*b*v11
+		a_v = (1-a)*(1-b)*v00 + (1-a)*b*v10 + a*(1-b)*v01 + a*b*v11
 
 		# print("this is v00", v00)
 		# print("this is v10", v10)
@@ -379,24 +386,24 @@ class HelloWorld(mglw.WindowConfig):
 		# 		b[k,l] = l - dt0 * gv[k, l, 0]
 		# 		i = 0.5 if i < 0.5 else i
 
+		#create meshgrid for the actual domain grid
 
-
-		N = len(q) - 2
+		N = 1/self.dx
 		d = q.copy()
 		d0 = q.copy()
-		print("this is gv", gv)
+		# print("this is gv", gv)
 		u, v = gv[:,:,0], gv[:,:,1]
 		dt0 = dt * N
 
-		for i in range(1, N+1):
-			for j in range(1, N+1):
-				x = i - dt0 * u[i, j]
-				y = j - dt0 * v[i, j]
-				x = min(max(x, 0.5), N + 0.5)
-				y = min(max(y, 0.5), N + 0.5)
-				i0, j0 = int(x), int(y)
+		for i in range(1, self.ny+1):
+			for j in range(1, self.nx+1):
+				x = j - dt0 * v[i, j]
+				y = i - dt0 * u[i, j]
+				x = min(max(x, 0.5), self.nx+1 + 0.5)
+				y = min(max(y, 0.5), self.ny+1 + 0.5)
+				i0, j0 = int(y), int(x)
 				i1, j1 = i0 + 1, j0 + 1
-				s1, t1 = x - i0, y - j0
+				s1, t1 = x - j0, y - i0
 				s0, t0 = 1 - s1, 1 - t1
 				d[i, j] = s0 * (t0 * d0[i0, j0] + t1 * d0[i0, j1]) + s1 * (t0 * d0[i1, j0] + t1 * d0[i1, j1])
 
@@ -406,12 +413,14 @@ class HelloWorld(mglw.WindowConfig):
 
 	def step(self, dt):
 		self.add_source_temperature(dt)
-		self.apply_temperature_force(dt)        
+		#self.apply_temperature_force(dt)        
 		#self.velocity_step(dt)
 		self.scalar_step(dt)
 		self.advect_particles(dt)
+		print("---------------------------------------------------------------------")
 
 	def add_source_temperature(self, dt):
+		print("add source temperature is being called")
 		for source in self.sources:
 			i,j,a,b = self.xy_to_ij(source.x, source.y)
 			self.curr_tp[i,j] += (1-a)*(1-b)*source.strength
@@ -422,36 +431,37 @@ class HelloWorld(mglw.WindowConfig):
 	def apply_temperature_force(self, dt):
 		'''Applies the buoyancy force to the velocity field.'''
 		# TODO: STEP 9: Complete this function
+		ref_temp = np.mean(self.curr_tp)
+
+		# Compute the temperature delta
+		temp_delta = self.curr_tp - ref_temp
+
+		# Update the vertical velocity
+		self.curr_v[:,:,1] += self.beta * dt * temp_delta
+		
+		# Set the boundary conditions
+		self.set_boundary(self.curr_v[:,:,1], 'vertical')
 		return # return nothing, this should modify the velocity field in place
 
 	def scalar_step(self, dt):
 		# TODO: STEP 5: Complete this function with a call to the diffuse and advect functions
-		self.curr_tp = self.diffuse(self.curr_tp, self.kappa, dt, "horizontal")
-		self.curr_tp = self.advect(self.curr_tp, dt, self.curr_v, "horizontal")
+		self.curr_tp = self.diffuse(self.curr_tp, self.kappa, dt, None)
+		self.curr_tp = self.advect(self.curr_tp, dt, self.curr_v, None)
 
 	def velocity_step(self, dt):
 		# TODO: STEP 7: Complete this function with calls to the diffuse, project, and advect functions
 		N = len(self.curr_tp) - 2
 		visc = self.viscosity
-		u0, v0 = self.curr_v[:,:,0], self.curr_v[:,:,1]
-		u, v = np.zeros((N+2, N+2)), np.zeros((N+2, N+2))
+		self.next_v[:,:,0] = self.diffuse(self.curr_v[:,:,0], visc, dt, "horizontal")
+		self.next_v[:,:,1] = self.diffuse(self.curr_v[:,:,1], visc, dt, "vertical")
 
-		self.add_source_temperature(dt)
-		self.add_source_temperature(dt)
-
-		u0, u = u, u0
-		self.diffuse(self.curr_tp, visc, dt, "horizontal")
-
-		v0, v = v, v0
-		self.diffuse(self.curr_tp, visc, dt, "vertical")
+		self.curr_v[:,:,0] = self.next_v[:,:,0]
+		self.curr_v[:,:,1] = self.next_v[:,:,1]
 
 		self.project()
 
-		u0, u = u, u0
-		v0, v = v, v0
-
-		self.advect(self.curr_tp, dt, np.array([u0, v0]), "horizontal")
-		self.advect(self.curr_tp, dt, np.array([u0, v0]), "vertical")
+		self.next_v[:,:,0] = self.advect(self.curr_v[:,:,0], dt, self.curr_v, "horizontal")
+		self.next_v[:,:,1] = self.advect(self.curr_v[:,:,1], dt, self.curr_v, "vertical")
 
 		self.project()
 
@@ -459,14 +469,14 @@ class HelloWorld(mglw.WindowConfig):
 	def project(self):
 		'''Solves the pressure Poisson equation to make the velocity field divergence free.'''
 		# TODO: STEP 6: Complete this function
-		N = len(self.curr_tp) - 2
+		N = 1/self.dx
 		h = 1.0 / N
 		u, v = self.curr_v[:,:,0], self.curr_v[:,:,1]
-		p = np.zeros((N+2, N+2))
-		div = np.zeros((N+2, N+2))
+		p = np.zeros((self.ny+2, self.nx+2))
+		div = np.zeros((self.ny+2, self.nx+2))
 
-		for i in range(1, N+1):
-			for j in range(1, N+1):
+		for i in range(1, self.ny+1):
+			for j in range(1, self.nx+1):
 				div[i, j] = -0.5 * h * (u[i+1, j] - u[i-1, j] + v[i, j+1] - v[i, j-1])
 				p[i, j] = 0
 
@@ -474,14 +484,14 @@ class HelloWorld(mglw.WindowConfig):
 		self.set_boundary(p, None)
 
 		for _ in range(20):
-			for i in range(1, N+1):
-				for j in range(1, N+1):
+			for i in range(1, self.ny+1):
+				for j in range(1, self.nx+1):
 					p[i, j] = (div[i, j] + p[i-1, j] + p[i+1, j] + p[i, j-1] + p[i, j+1]) / 4
 
 			self.set_boundary(p, None)
 
-		for i in range(1, N+1):
-			for j in range(1, N+1):
+		for i in range(1, self.ny+1):
+			for j in range(1, self.nx+1):
 				u[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / h
 				v[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / h
 
