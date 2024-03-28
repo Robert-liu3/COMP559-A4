@@ -315,12 +315,12 @@ class HelloWorld(mglw.WindowConfig):
 			q[:, -1] = q[:, -2]
 		elif boundary_type == 'vertical':
 			# Set vertical boundaries to zero
-			q[:, 0] = 0
-			q[:, -1] = 0
+			q[0, :] = -q[1, :]
+			q[-1, :] = -q[-2, :]
 		elif boundary_type == 'horizontal':
 			# Set horizontal boundaries to zero
-			q[0, :] = 0
-			q[-1, :] = 0
+			q[:, 0] = -q[:, 1]
+			q[:, -1] = -q[:, -2]	
 		else:
 			raise ValueError(f"Invalid boundary type: {boundary_type}")
 		return q
@@ -436,7 +436,7 @@ class HelloWorld(mglw.WindowConfig):
 
 	def step(self, dt):
 		self.add_source_temperature(dt)
-		#self.apply_temperature_force(dt)        
+		self.apply_temperature_force(dt)        
 		self.velocity_step(dt)
 		self.scalar_step(dt)
 		self.advect_particles(dt)
