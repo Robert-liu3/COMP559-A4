@@ -279,7 +279,7 @@ class HelloWorld(mglw.WindowConfig):
 
 
 		N = 1/self.dx
-		a = dt * kappa * N * N
+		a = dt * kappa * self.nx * self.ny
 		q = q0.copy()
 
 
@@ -388,24 +388,47 @@ class HelloWorld(mglw.WindowConfig):
 
 		#create meshgrid for the actual domain grid
 
-		N = 1/self.dx
+
+		# d = q.copy()
+		# d0 = q.copy()
+		# # print("this is gv", gv)
+		# u, v = gv[:,:,0], gv[:,:,1]
+		# dt0 = dt * N
+
+		# for i in range(1, self.ny+1):
+		# 	for j in range(1, self.nx+1):
+		# 		x = j - dt0 * v[i, j]
+		# 		y = i - dt0 * u[i, j]
+		# 		x = min(max(x, 0.5), self.nx + 0.5)
+		# 		y = min(max(y, 0.5), self.ny + 0.5)
+		# 		i0, j0 = int(y), int(x)
+		# 		i1, j1 = i0 + 1, j0 + 1
+		# 		s1, t1 = x - j0, y - i0
+		# 		s0, t0 = 1 - s1, 1 - t1
+		# 		d[i, j] = s0 * (t0 * d0[i0, j0] + t1 * d0[i0, j1]) + s1 * (t0 * d0[i1, j0] + t1 * d0[i1, j1])
+
+		# self.set_boundary(d, boundary_type)
+
+
+
 		d = q.copy()
 		d0 = q.copy()
-		# print("this is gv", gv)
 		u, v = gv[:,:,0], gv[:,:,1]
-		dt0 = dt * N
 
-		for i in range(1, self.ny+1):
-			for j in range(1, self.nx+1):
-				x = j - dt0 * v[i, j]
-				y = i - dt0 * u[i, j]
-				x = min(max(x, 0.5), self.nx+1 + 0.5)
-				y = min(max(y, 0.5), self.ny+1 + 0.5)
-				i0, j0 = int(y), int(x)
-				i1, j1 = i0 + 1, j0 + 1
-				s1, t1 = x - j0, y - i0
-				s0, t0 = 1 - s1, 1 - t1
-				d[i, j] = s0 * (t0 * d0[i0, j0] + t1 * d0[i0, j1]) + s1 * (t0 * d0[i1, j0] + t1 * d0[i1, j1])
+		I, J = np.ogrid[1:self.ny+1, 1:self.nx+1]
+
+		X = J - dt*self.nx * v[1:self.ny+1, 1:self.nx+1]
+		Y = I - dt*self.ny * u[1:self.ny+1, 1:self.nx+1]
+
+		X = np.clip(X, 0.5, self.nx + 0.5)
+		Y = np.clip(Y, 0.5, self.ny + 0.5)
+
+		I0, J0 = np.floor(Y).astype(int), np.floor(X).astype(int)
+		I1, J1 = I0 + 1, J0 + 1
+		S1, T1 = X - J0, Y - I0
+		S0, T0 = 1 - S1, 1 - T1
+
+		d[1:self.ny+1, 1:self.nx+1] = S0 * (T0 * d0[I0, J0] + T1 * d0[I0, J1]) + S1 * (T0 * d0[I1, J0] + T1 * d0[I1, J1])
 
 		self.set_boundary(d, boundary_type)
     	
@@ -414,7 +437,7 @@ class HelloWorld(mglw.WindowConfig):
 	def step(self, dt):
 		self.add_source_temperature(dt)
 		#self.apply_temperature_force(dt)        
-		#self.velocity_step(dt)
+		self.velocity_step(dt)
 		self.scalar_step(dt)
 		self.advect_particles(dt)
 		print("---------------------------------------------------------------------")
@@ -441,7 +464,6 @@ class HelloWorld(mglw.WindowConfig):
 		
 		# Set the boundary conditions
 		self.set_boundary(self.curr_v[:,:,1], 'vertical')
-		return # return nothing, this should modify the velocity field in place
 
 	def scalar_step(self, dt):
 		# TODO: STEP 5: Complete this function with a call to the diffuse and advect functions
@@ -463,22 +485,30 @@ class HelloWorld(mglw.WindowConfig):
 		self.next_v[:,:,0] = self.advect(self.curr_v[:,:,0], dt, self.curr_v, "horizontal")
 		self.next_v[:,:,1] = self.advect(self.curr_v[:,:,1], dt, self.curr_v, "vertical")
 
+		self.curr_v[:,:,0] = self.next_v[:,:,0]
+		self.curr_v[:,:,1] = self.next_v[:,:,1]
+
 		self.project()
 
 	# Projection step to make the velocity field divergence free
 	def project(self):
 		'''Solves the pressure Poisson equation to make the velocity field divergence free.'''
 		# TODO: STEP 6: Complete this function
-		N = 1/self.dx
-		h = 1.0 / N
+		# Nx = 1/self.dx
+		# Ny = 1/self.dy
+		# hx = 1.0 / Nx
+		# hy = 1.0 / Ny
 		u, v = self.curr_v[:,:,0], self.curr_v[:,:,1]
 		p = np.zeros((self.ny+2, self.nx+2))
 		div = np.zeros((self.ny+2, self.nx+2))
 
-		for i in range(1, self.ny+1):
-			for j in range(1, self.nx+1):
-				div[i, j] = -0.5 * h * (u[i+1, j] - u[i-1, j] + v[i, j+1] - v[i, j-1])
-				p[i, j] = 0
+		div[1:self.ny+1, 1:self.nx+1] = -0.5 * self.dx * (u[1:self.ny+1, 2:self.nx+2] - u[1:self.ny+1, :-2] + v[2:self.ny+2, 1:self.nx+1] - v[:-2, 1:self.nx+1])
+		p[1:self.ny+1, 1:self.nx+1] = 0
+
+		# for i in range(1, self.ny+1):
+		# 	for j in range(1, self.nx+1):
+		# 		div[i, j] = -0.5 * self.dx * (u[i, j+1] - u[i, j-1] + v[i+1, j] - v[i-1, j])
+		# 		p[i, j] = 0
 
 		self.set_boundary(div, None)
 		self.set_boundary(p, None)
@@ -490,13 +520,19 @@ class HelloWorld(mglw.WindowConfig):
 
 			self.set_boundary(p, None)
 
-		for i in range(1, self.ny+1):
-			for j in range(1, self.nx+1):
-				u[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / h
-				v[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / h
+		# for i in range(1, self.ny+1):
+		# 	for j in range(1, self.nx+1):
+		# 		v[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / self.dx
+		# 		u[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / self.dx
+			
+		v[1:self.ny+1, 1:self.nx+1] -= 0.5 * (p[2:self.ny+2, 1:self.nx+1] - p[:-2, 1:self.nx+1]) / self.dx
+		u[1:self.ny+1, 1:self.nx+1] -= 0.5 * (p[1:self.ny+1, 2:self.nx+2] - p[1:self.ny+1, :-2]) / self.dx
 
 		self.set_boundary(u, "horizontal")
 		self.set_boundary(v, "vertical")
+		
+		self.curr_v[:,:,0] = u
+		self.curr_v[:,:,1] = v
 		
 	
 	def render(self, time, frame_time):		
