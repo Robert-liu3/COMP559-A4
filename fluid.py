@@ -31,7 +31,7 @@ class HelloWorld(mglw.WindowConfig):
 	win_width = pix_per_cell*(nx+4)
 	win_height = pix_per_cell*(ny+4)
 	gl_version = (3, 3)
-	title = "Stable Fluid Simulation - YOUR NAME AND STUDENT ID HERE"
+	title = "Stable Fluid Simulation - Robert Liu 260981372"
 	window_size = (win_width, win_height)
 	aspect_ratio = win_width / win_height
 	resizable = True
