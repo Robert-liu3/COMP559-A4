@@ -273,16 +273,14 @@ class HelloWorld(mglw.WindowConfig):
 		# 		for j in range(self.iterations):
 		# 			q[1:-1, 1:-1] = (q0[1:-1, 1:-1] + a*(q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:]))/(1+4*a)
 		# 			q = self.set_boundary(q, boundary_type)
-		x = np.arange(self.nx+1)
-		y = np.arange(self.ny+1)
-		X, Y = np.meshgrid(x, y)
+		# x = np.arange(self.nx+1)
+		# y = np.arange(self.ny+1)
+		# X, Y = np.meshgrid(x, y)
 
 
-		N = 1/self.dx
+		# N = 1/self.dx
 		a = dt * kappa * self.nx * self.ny
 		q = q0.copy()
-
-
 
 		for _ in range(self.iterations):
 			q[1:self.ny+1, 1:self.nx+1] = (q0[1:self.ny+1, 1:self.nx+1] + a * (q[:-2, 1:-1] + q[2:, 1:-1] + q[1:-1, :-2] + q[1:-1, 2:])) / (1 + 4 * a)
@@ -375,6 +373,7 @@ class HelloWorld(mglw.WindowConfig):
 				boundary_type (str): type of boundary condition to apply (None, "vertical", "horizontal")
 			Returns (np.array): Advected quantities
 		'''
+
 		# TODO: STEP 4: Complete this function
 
 		# dt0 = dt * self.iterations
@@ -417,8 +416,8 @@ class HelloWorld(mglw.WindowConfig):
 
 		I, J = np.ogrid[1:self.ny+1, 1:self.nx+1]
 
-		X = J - dt*self.nx * v[1:self.ny+1, 1:self.nx+1]
-		Y = I - dt*self.ny * u[1:self.ny+1, 1:self.nx+1]
+		X = J - dt*self.nx * u[1:self.ny+1, 1:self.nx+1]
+		Y = I - dt*self.ny * v[1:self.ny+1, 1:self.nx+1]
 
 		X = np.clip(X, 0.5, self.nx + 0.5)
 		Y = np.clip(Y, 0.5, self.ny + 0.5)
@@ -428,7 +427,7 @@ class HelloWorld(mglw.WindowConfig):
 		S1, T1 = X - J0, Y - I0
 		S0, T0 = 1 - S1, 1 - T1
 
-		d[1:self.ny+1, 1:self.nx+1] = S0 * (T0 * d0[I0, J0] + T1 * d0[I0, J1]) + S1 * (T0 * d0[I1, J0] + T1 * d0[I1, J1])
+		d[1:self.ny+1, 1:self.nx+1] = S0 * (T0 * d0[I0, J0] + T1 * d0[I1, J0]) + S1 * (T0 * d0[I0, J1] + T1 * d0[I1, J1])
 
 		self.set_boundary(d, boundary_type)
     	
@@ -440,10 +439,8 @@ class HelloWorld(mglw.WindowConfig):
 		self.velocity_step(dt)
 		self.scalar_step(dt)
 		self.advect_particles(dt)
-		print("---------------------------------------------------------------------")
 
 	def add_source_temperature(self, dt):
-		print("add source temperature is being called")
 		for source in self.sources:
 			i,j,a,b = self.xy_to_ij(source.x, source.y)
 			self.curr_tp[i,j] += (1-a)*(1-b)*source.strength
@@ -522,18 +519,20 @@ class HelloWorld(mglw.WindowConfig):
 
 		# for i in range(1, self.ny+1):
 		# 	for j in range(1, self.nx+1):
-		# 		v[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / self.dx
-		# 		u[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / self.dx
+		# 		u[i, j] -= 0.5 * (p[i+1, j] - p[i-1, j]) / self.dx
+		# 		v[i, j] -= 0.5 * (p[i, j+1] - p[i, j-1]) / self.dx
 			
 		v[1:self.ny+1, 1:self.nx+1] -= 0.5 * (p[2:self.ny+2, 1:self.nx+1] - p[:-2, 1:self.nx+1]) / self.dx
 		u[1:self.ny+1, 1:self.nx+1] -= 0.5 * (p[1:self.ny+1, 2:self.nx+2] - p[1:self.ny+1, :-2]) / self.dx
+
 
 		self.set_boundary(u, "horizontal")
 		self.set_boundary(v, "vertical")
 		
 		self.curr_v[:,:,0] = u
 		self.curr_v[:,:,1] = v
-		
+
+			
 	
 	def render(self, time, frame_time):		
 		self.ctx.clear(0,0,0)
